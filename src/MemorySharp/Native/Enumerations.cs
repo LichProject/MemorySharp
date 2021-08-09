@@ -582,117 +582,6 @@ namespace Binarysharp.MemoryManagement.Native
     }
     #endregion
 
-    #region PebStructure
-    /// <summary>
-    /// The structure of the Process Environment Block.
-    /// </summary>
-    /// <remarks>
-    /// Tested on Windows 7 x64, 2013-03-10
-    /// Source: http://blog.rewolf.pl/blog/?p=573#.UTyBo1fJL6p
-    /// </remarks>
-    public enum PebStructure
-    {
-        InheritedAddressSpace = 0x0,
-        ReadImageFileExecOptions = 0x1,
-        /// <summary>
-        /// Gets if the process is being debugged.
-        /// </summary>
-        BeingDebugged = 0x2,
-        SpareBool = 0x3,
-        Mutant = 0x4,
-        ImageBaseAddress = 0x8,
-        Ldr = 0xC,
-        ProcessParameters = 0x10,
-        SubSystemData = 0x14,
-        ProcessHeap = 0x18,
-        FastPebLock = 0x1C,
-        FastPebLockRoutine = 0x20,
-        FastPebUnlockRoutine = 0x24,
-        EnvironmentUpdateCount = 0x28,
-        KernelCallbackTable = 0x2C,
-        SystemReserved = 0x30,
-        AtlThunkSListPtr32 = 0x34,
-        FreeList = 0x38,
-        TlsExpansionCounter = 0x3C,
-        TlsBitmap = 0x40,
-        /// <summary>
-        /// Length: 8 bytes.
-        /// </summary>
-        TlsBitmapBits = 0x44,
-        ReadOnlySharedMemoryBase = 0x4C,
-        ReadOnlySharedMemoryHeap = 0x50,
-        ReadOnlyStaticServerData = 0x54,
-        AnsiCodePageData = 0x58,
-        OemCodePageData = 0x5C,
-        UnicodeCaseTableData = 0x60,
-        NumberOfProcessors = 0x64,
-        /// <summary>
-        /// Length: 8 bytes.
-        /// </summary>
-        NtGlobalFlag = 0x68,
-        /// <summary>
-        /// Length: 8 bytes (LARGE_INTEGER type).
-        /// </summary>
-        CriticalSectionTimeout = 0x70,
-        HeapSegmentReserve = 0x78,
-        HeapSegmentCommit = 0x7C,
-        HeapDeCommitTotalFreeThreshold = 0x80,
-        HeapDeCommitFreeBlockThreshold = 0x84,
-        NumberOfHeaps = 0x88,
-        MaximumNumberOfHeaps = 0x8C,
-        ProcessHeaps = 0x90,
-        GdiSharedHandleTable = 0x94,
-        ProcessStarterHelper = 0x98,
-        GdiDcAttributeList = 0x9C,
-        LoaderLock = 0xA0,
-        OsMajorVersion = 0xA4,
-        OsMinorVersion = 0xA8,
-        /// <summary>
-        /// Length: 2 bytes.
-        /// </summary>
-        OsBuildNumber = 0xAC,
-        /// <summary>
-        /// Length: 2 bytes.
-        /// </summary>
-        OsCsdVersion = 0xAE,
-        OsPlatformId = 0xB0,
-        ImageSubsystem = 0xB4,
-        ImageSubsystemMajorVersion = 0xB8,
-        ImageSubsystemMinorVersion = 0xBC,
-        ImageProcessAffinityMask = 0xC0,
-        /// <summary>
-        /// Length: 0x88 bytes (0x22 * sizeof(IntPtr)).
-        /// </summary>
-        GdiHandleBuffer = 0xC4,
-        PostProcessInitRoutine = 0x14C,
-        TlsExpansionBitmap = 0x150,
-        /// <summary>
-        /// Length: 0x80 bytes (0x20 * sizeof(IntPtr))
-        /// </summary>
-        TlsExpansionBitmapBits = 0x154,
-        SessionId = 0x1D4,
-        /// <summary>
-        /// Length: 8 bytes (LARGE_INTEGER type).
-        /// </summary>
-        AppCompatFlags = 0x1D8,
-        /// <summary>
-        /// Length: 8 bytes (LARGE_INTEGER type).
-        /// </summary>
-        AppCompatFlagsUser = 0x1E0,
-        ShimData = 0x1E8,
-        AppCompatInfo = 0x1EC,
-        /// <summary>
-        /// Length: 8 bytes (UNICODE_STRING type).
-        /// </summary>
-        CsdVersion = 0x1F0,
-        ActivationContextData = 0x1F8,
-        ProcessAssemblyStorageMap = 0x1FC,
-        SystemDefaultActivationContextData = 0x200,
-        SystemAssemblyStorageMap = 0x204,
-        MinimumStackCommit = 0x208
-    }
-    #endregion
-
     #region ProcessAccessFlags
     /// <summary>
     /// Process access rights list.
@@ -798,201 +687,6 @@ namespace Binarysharp.MemoryManagement.Native
     }
     #endregion
 
-    #region TebStructure
-    /// <summary>
-    /// The structure of the Thread Environment Block.
-    /// </summary>
-    /// <remarks>Tested on Windows 7 x64, 2013-03-10.</remarks>
-    public enum TebStructure
-    {
-        /// <summary>
-        /// Current Structured Exception Handling (SEH) frame.
-        /// </summary>
-        CurrentSehFrame = 0x0,
-        /// <summary>
-        /// The top of stack.
-        /// </summary>
-        TopOfStack = 0x4,
-        /// <summary>
-        /// The current bottom of stack.
-        /// </summary>
-        BottomOfStack = 0x8,
-        /// <summary>
-        /// The TEB sub system.
-        /// </summary>
-        SubSystemTeb = 0xC,
-        /// <summary>
-        /// The fiber data.
-        /// </summary>
-        FiberData = 0x10,
-        /// <summary>
-        /// The arbitrary data slot.
-        /// </summary>
-        ArbitraryDataSlot = 0x14,
-        /// <summary>
-        /// The linear address of Thread Environment Block (TEB).
-        /// </summary>
-        Teb = 0x18,
-        /// <summary>
-        /// The environment pointer.
-        /// </summary>
-        EnvironmentPointer = 0x1C,
-        /// <summary>
-        /// The process Id.
-        /// </summary>
-        ProcessId = 0x20,
-        /// <summary>
-        /// The current thread Id.
-        /// </summary>
-        ThreadId = 0x24,
-        /// <summary>
-        /// The active RPC handle.
-        /// </summary>
-        RpcHandle = 0x28,
-        /// <summary>
-        /// The linear address of the thread-local storage (TLS) array.
-        /// </summary>
-        Tls = 0x2C,
-        /// <summary>
-        /// The linear address of Process Environment Block (PEB).
-        /// </summary>
-        Peb = 0x30,
-        /// <summary>
-        /// The last error number.
-        /// </summary>
-        LastErrorNumber = 0x34,
-        /// <summary>
-        /// The count of owned critical sections.
-        /// </summary>
-        CriticalSectionsCount = 0x38,
-        /// <summary>
-        /// The address of CSR Client Thread.
-        /// </summary>
-        CsrClientThread = 0x3C,
-        /// <summary>
-        /// Win32 Thread Information.
-        /// </summary>
-        Win32ThreadInfo = 0x40,
-        /// <summary>
-        /// Win32 client information (NT), user32 private data (Wine), 0x60 = LastError (Win95), 0x74 = LastError (WinME). (length: 124 bytes)
-        /// </summary>
-        Win32ClientInfo = 0x44,
-        /// <summary>
-        /// Reserved for Wow64. Contains a pointer to FastSysCall in Wow64.
-        /// </summary>
-        WoW64Reserved = 0xC0,
-        /// <summary>
-        /// The current locale.
-        /// </summary>
-        CurrentLocale = 0xC4,
-        /// <summary>
-        /// The FP Software Status Register.
-        /// </summary>
-        FpSoftwareStatusRegister = 0xC8,
-        /// <summary>
-        /// Reserved for OS (NT), kernel32 private data (Wine). (length: 216 bytes)
-        /// herein: FS:[0x124] 4 NT Pointer to KTHREAD (ETHREAD) structure.
-        /// </summary>
-        SystemReserved1 = 0xCC,
-        /// <summary>
-        /// The exception code.
-        /// </summary>
-        ExceptionCode = 0x1A4,
-        /// <summary>
-        /// The activation context stack. (length: 18 bytes)
-        /// </summary>
-        ActivationContextStack = 0x1A8,
-        /// <summary>
-        /// The spare bytes (NT), ntdll private data (Wine). (length: 24 bytes)
-        /// </summary>
-        SpareBytes = 0x1BC,
-        /// <summary>
-        /// Reserved for OS (NT), ntdll private data (Wine). (length: 40 bytes)
-        /// </summary>
-        SystemReserved2 = 0x1D4,
-        /// <summary>
-        /// The GDI TEB Batch (OS), vm86 private data (Wine). (length: 1248 bytes)
-        /// </summary>
-        GdiTebBatch = 0x1FC,
-        /// <summary>
-        /// The GDI Region.
-        /// </summary>
-        GdiRegion = 0x6DC,
-        /// <summary>
-        /// The GDI Pen.
-        /// </summary>
-        GdiPen = 0x6E0,
-        /// <summary>
-        /// The GDI Brush.
-        /// </summary>
-        GdiBrush = 0x6E4,
-        /// <summary>
-        /// The real process Id.
-        /// </summary>
-        RealProcessId = 0x6E8,
-        /// <summary>
-        /// The real thread Id.
-        /// </summary>
-        RealThreadId = 0x6EC,
-        /// <summary>
-        /// The GDI cached process handle.
-        /// </summary>
-        GdiCachedProcessHandle = 0x6F0,
-        /// <summary>
-        /// The GDI client process Id (PID).
-        /// </summary>
-        GdiClientProcessId = 0x6F4,
-        /// <summary>
-        /// The GDI client thread Id (TID).
-        /// </summary>
-        GdiClientThreadId = 0x6F8,
-        /// <summary>
-        /// The GDI thread locale information.
-        /// </summary>
-        GdiThreadLocalInfo = 0x6FC,
-        /// <summary>
-        /// Reserved for user application. (length: 20 bytes)
-        /// </summary>
-        UserReserved1 = 0x700,
-        /// <summary>
-        /// Reserved for GL. (length: 1248 bytes)
-        /// </summary>
-        GlReserved1 = 0x714,
-        /// <summary>
-        /// The last value status value.
-        /// </summary>
-        LastStatusValue = 0xBF4,
-        /// <summary>
-        /// The static UNICODE_STRING buffer. (length: 532 bytes)
-        /// </summary>
-        StaticUnicodeString = 0xBF8,
-        /// <summary>
-        /// The pointer to deallocation stack.
-        /// </summary>
-        DeallocationStack = 0xE0C,
-        /// <summary>
-        /// The TLS slots, 4 byte per slot. (length: 256 bytes)
-        /// </summary>
-        TlsSlots = 0xE10,
-        /// <summary>
-        /// The TLS links (LIST_ENTRY structure). (length 8 bytes)
-        /// </summary>
-        TlsLinks = 0xF10,
-        /// <summary>
-        /// Virtual DOS Machine.
-        /// </summary>
-        Vdm = 0xF18,
-        /// <summary>
-        /// Reserved for RPC.
-        /// </summary>
-        RpcReserved = 0xF1C,
-        /// <summary>
-        /// The thread error mode (RtlSetThreadErrorMode).
-        /// </summary>
-        ThreadErrorMode = 0xF28
-    }
-    #endregion
-
     #region ThreadAccessFlags
 
     /// <summary>
@@ -1062,7 +756,7 @@ namespace Binarysharp.MemoryManagement.Native
     /// Determines which registers are returned or set when using <see cref="NativeMethods.GetThreadContext"/> or <see cref="NativeMethods.SetThreadContext"/>.
     /// </summary>
     [Flags]
-    public enum ThreadContextFlags
+    public enum ThreadContextFlags : uint
     {
         /// <summary>
         /// The Intel 80386 microprocessor, also known as the i386.
@@ -1126,6 +820,66 @@ namespace Binarysharp.MemoryManagement.Native
         /// The dwStackSize parameter specifies the initial reserve size of the stack. If this flag is not specified, dwStackSize specifies the commit size.
         /// </summary>
         StackSizeParamIsAReservation = 0x10000
+    }
+    #endregion
+
+    #region ThreadInformationClass    
+    /// <summary>
+    ///The numeration that corresponds to the classes of thread information.
+    /// </summary>
+    public enum ThreadInformationClass : uint
+    {
+        ThreadBasicInformation = 0,
+        ThreadTimes = 1,
+        ThreadPriority = 2,
+        ThreadBasePriority = 3,
+        ThreadAffinityMask = 4,
+        ThreadImpersonationToken = 5,
+        ThreadDescriptorTableEntry = 6,
+        ThreadEnableAlignmentFaultFixup = 7,
+        ThreadEventPair_Reusable = 8,
+        ThreadQuerySetWin32StartAddress = 9,
+        ThreadZeroTlsCell = 10,
+        ThreadPerformanceCount = 11,
+        ThreadAmILastThread = 12,
+        ThreadIdealProcessor = 13,
+        ThreadPriorityBoost = 14,
+        ThreadSetTlsArrayAddress = 15,
+        ThreadIsIoPending = 16,
+        ThreadHideFromDebugger = 17,
+        ThreadBreakOnTermination = 18,
+        ThreadSwitchLegacyState = 19,
+        ThreadIsTerminated = 20,
+        ThreadLastSystemCall = 21,
+        ThreadIoPriority = 22,
+        ThreadCycleTime = 23,
+        ThreadPagePriority = 24,
+        ThreadActualBasePriority = 25,
+        ThreadTebInformation = 26,
+        ThreadCSwitchMon = 27,
+        ThreadCSwitchPmu = 28,
+        ThreadWow64Context = 29,
+        ThreadGroupInformation = 30,
+        ThreadUmsInformation = 31,
+        ThreadCounterProfiling = 32,
+        ThreadIdealProcessorEx = 33,
+        ThreadCpuAccountingInformation = 34,
+        ThreadSuspendCount = 35,
+        ThreadHeterogeneousCpuPolicy = 36,
+        ThreadContainerId = 37,
+        ThreadNameInformation = 38,
+        ThreadSelectedCpuSets = 39,
+        ThreadSystemThreadInformation = 40,
+        ThreadActualGroupAffinity = 41,
+        ThreadDynamicCodePolicyInfo = 42,
+        ThreadExplicitCaseSensitivity = 43,
+        ThreadWorkOnBehalfTicket = 44,
+        ThreadSubsystemInformation = 45,
+        ThreadDbgkWerReportActive = 46,
+        ThreadAttachContainer = 47,
+        ThreadManageWritesToExecutableMemory = 48,
+        ThreadPowerThrottlingState = 49,
+        ThreadWorkloadClass = 50,
     }
     #endregion
 

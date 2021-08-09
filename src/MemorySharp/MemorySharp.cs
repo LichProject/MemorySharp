@@ -37,7 +37,15 @@ namespace Binarysharp.MemoryManagement
         /// <summary>
         /// The factories embedded inside the library.
         /// </summary>
-        protected List<IFactory> Factories;
+        protected readonly List<IFactory> Factories;
+        /// <summary>
+        /// The internal field that stores the lazy evaluation for the architecture of the process.
+        /// </summary>
+        private readonly Lazy<bool> _is64Process;
+        /// <summary>
+        /// The internal field that stores the lazy evaluation for the managed process environment block.
+        /// </summary>
+        private readonly Lazy<ManagedPeb> _peb;
         #endregion
 
         #region Properties
@@ -47,14 +55,20 @@ namespace Binarysharp.MemoryManagement
         /// </summary>
         public AssemblyFactory Assembly { get; protected set; }
         #endregion
+        #region Is64Process        
+        /// <summary>
+        /// Gets a value indicating whether this is a 64-bit process.
+        /// </summary>
+        public bool Is64Process => _is64Process.Value;
+        #endregion
         #region IsDebugged
         /// <summary>
         /// Gets whether the process is being debugged.
         /// </summary>
         public bool IsDebugged
         {
-            get { return Peb.BeingDebugged; }
-            set { Peb.BeingDebugged = value; }
+            get => Peb.BeingDebugged == 1;
+            set => Peb.BeingDebugged = value ? (byte) 1 : (byte) 0;
         }
         #endregion
         #region IsRunning
@@ -94,7 +108,7 @@ namespace Binarysharp.MemoryManagement
         /// <summary>
         /// The Process Environment Block of the process.
         /// </summary>
-        public ManagedPeb Peb { get; private set; }
+        public ManagedPeb Peb => _peb.Value;
         #endregion
         #region Pid
         /// <summary>
@@ -153,8 +167,11 @@ namespace Binarysharp.MemoryManagement
             // Open the process with all rights
             Handle = MemoryCore.OpenProcess(ProcessAccessFlags.AllAccess, process.Id);
 
+            // Initialize the architecture detector
+            _is64Process = new Lazy<bool>(() => ArchitectureDetector.Is64Process(Handle));
+
             // Initialize the PEB
-            Peb = new ManagedPeb(this, ManagedPeb.FindPeb(Handle));
+            _peb = new Lazy<ManagedPeb>(() => new ManagedPeb(this));
 
             // Create instances of the factories
             Factories = new List<IFactory>();

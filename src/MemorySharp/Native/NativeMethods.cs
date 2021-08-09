@@ -186,18 +186,18 @@ namespace Binarysharp.MemoryManagement.Native
         /// WOW64: The handle must also have <see cref="ThreadAccessFlags.QueryInformation"/> access.
         /// </param>
         /// <param name="lpContext">
-        /// [Ref] A pointer to a <see cref="ThreadContext"/> structure that receives the appropriate context of the specified thread. 
+        /// A pointer to a thread context structure that receives the appropriate context of the specified thread. 
         /// The value of the ContextFlags member of this structure specifies which portions of a thread's context are retrieved. 
-        /// The <see cref="ThreadContext"/> structure is highly processor specific.
+        /// The structure structure is highly processor specific and because of that, that parameter is a pointer on the correct structure.
         /// Refer to the WinNT.h header file for processor-specific definitions of this structures and any alignment requirements.
         /// </param>
         /// <returns>
         /// If the function succeeds, the return value is nonzero.
         /// If the function fails, the return value is zero. To get extended error information, call <see cref="Marshal.GetLastWin32Error"/>.
+        /// The return type is initially a BOOL (of 4 bytes length), which corresponds to an integer to prevent any marshalling.
         /// </returns>
         [DllImport("kernel32.dll", SetLastError = true)]
-        public static extern bool GetThreadContext(SafeMemoryHandle hThread, ref ThreadContext lpContext);
-
+        public static extern unsafe void* GetThreadContext(SafeMemoryHandle hThread, void* lpContext);
         #endregion
 
         #region GetThreadSelectorEntry
@@ -356,6 +356,22 @@ namespace Binarysharp.MemoryManagement.Native
         public static extern bool FlashWindowEx(ref FlashInfo pwfi);
         #endregion
 
+        #region IsWow64Process        
+        /// <summary>
+        /// Determines whether the specified process is running under WOW64 or an Intel64 of x64 processor.
+        /// </summary>
+        /// <param name="handle">
+        /// A handle to the process. The handle must have the <see cref="ProcessAccessFlags.QueryInformation"/> or <see cref="ProcessAccessFlags.QueryLimitedInformation"/> access right.
+        /// </param>
+        /// <param name="isWow64Process">
+        /// A pointer to a value that is set to TRUE if the process is running under WOW64 on an Intel64 or x64 processor. If the process is running under 32-bit Windows, the value is set to FALSE.
+        /// If the process is a 32-bit application running under 64-bit Windows 10 on ARM, the value is set to FALSE. If the process is a 64-bit application running under 64-bit Windows, the value is also set to FALSE.
+        /// </param>
+        /// <returns>If the function succeeds, the return value is a nonzero value.</returns>
+        [DllImport("kernel32", SetLastError = true)]
+        public static extern int IsWow64Process(SafeMemoryHandle handle, out int isWow64Process);
+        #endregion
+
         #region LoadLibrary
         /// <summary>
         /// Loads the specified module into the address space of the calling process. The specified module may cause other modules to be loaded.
@@ -403,50 +419,37 @@ namespace Binarysharp.MemoryManagement.Native
         /// Retrieves information about the specified process.
         /// </summary>
         /// <param name="processHandle">A handle to the process for which information is to be retrieved.</param>
-        /// <param name="infoclass">The type of process information to be retrieved.</param>
-        /// <param name="processinfo">A pointer to a buffer supplied by the calling application into which the function writes the requested information.</param>
-        /// <param name="length">The size of the buffer pointed to by the ProcessInformation parameter, in bytes.</param>
-        /// <param name="bytesread">
-        /// [Optional] A pointer to a variable in which the function returns the size of the requested information.
+        /// <param name="processInformationClass">The type of process information to be retrieved.</param>
+        /// <param name="processInformation">A pointer to a buffer supplied by the calling application into which the function writes the requested information.</param>
+        /// <param name="processInformationLength">The size of the buffer pointed to by the ProcessInformation parameter, in bytes.</param>
+        /// <param name="returnLength">
+        /// A pointer to a variable in which the function returns the size of the requested information.
         /// If the function was successful, this is the size of the information written to the buffer pointed to by the ProcessInformation parameter,
         /// but if the buffer was too small, this is the minimum size of buffer needed to receive the information successfully.
         /// </param>
         /// <returns>Returns an NTSTATUS success or error code. (STATUS_SUCCESS = 0x0).</returns>
         [DllImport("ntdll.dll")]
-        public static extern int NtQueryInformationProcess(SafeMemoryHandle processHandle, ProcessInformationClass infoclass, 
-            ref ProcessBasicInformation processinfo, int length, IntPtr bytesread);
+        public static extern unsafe uint NtQueryInformationProcess(SafeMemoryHandle processHandle, ProcessInformationClass processInformationClass, 
+            void* processInformation, IntPtr processInformationLength, out IntPtr returnLength);
         #endregion
 
         #region NtQueryInformationThread
         /// <summary>
         /// Retrieves information about the specified thread.
         /// </summary>
-        /// <param name="hwnd">A handle to the thread about which information is being requested.</param>
-        /// <param name="infoclass">
-        /// Usually equals to 0 to dump all the structure correctly.
-        /// 
-        /// If this parameter is the ThreadIsIoPending value of the THREADINFOCLASS enumeration, the function determines whether the thread has any I/O operations pending.
-        /// If this parameter is the ThreadQuerySetWin32StartAddress value of the THREADINFOCLASS enumeration, the function returns the start address of the thread. 
-        /// Note that on versions of Windows prior to Windows Vista, the returned start address is only reliable before the thread starts running.
+        /// <param name="handle">A handle to the thread about which information is being requested.</param>
+        /// <param name="threadInformationClass">The class of information to retrieve and store in the thread information buffer parameter.</param>
+        /// <param name="threadInformation">A pointer to a buffer in which the function writes the requested information.</param>
+        /// <param name="threadInformationLength">The size of the buffer pointed to by the thread information parameter, in bytes.</param>
+        /// <param name="returnLength">
+        /// A pointer to a variable in which the function returns the size of the requested information. If the function was successful,
+        /// this is the size of the information written to the buffer pointed to by the thread information parameter, but if the buffer was too small,
+        /// this is the minimum size of buffer required to receive the information successfully.
         /// </param>
-        /// <param name="threadinfo">
-        /// A pointer to a buffer in which the function writes the requested information. 
-        /// If ThreadIsIoPending is specified for the ThreadInformationClass parameter, this buffer must be large enough to hold a ULONG value, 
-        /// which indicates whether the specified thread has I/O requests pending. 
-        /// If this value is equal to zero, then there are no I/O operations pending; otherwise, if the value is nonzero, then the thread does have I/O operations pending.
-        /// 
-        /// If ThreadQuerySetWin32StartAddress is specified for the ThreadInformationClass parameter, 
-        /// this buffer must be large enough to hold a PVOID value, which is the start address of the thread.
-        /// </param>
-        /// <param name="length">The size of the buffer pointed to by the ThreadInformation parameter, in bytes.</param>
-        /// <param name="bytesread">
-        /// [Optional] A pointer to a variable in which the function returns the size of the requested information. 
-        /// If the function was successful, this is the size of the information written to the buffer pointed to by the ThreadInformation parameter, 
-        /// but if the buffer was too small, this is the minimum size of buffer required to receive the information successfully.
-        /// </param>
-        /// <returns>Returns an NTSTATUS success or error code. (STATUS_SUCCESS = 0x0).</returns>
+        /// <returns>Returns an NTSTATUS success or error code.</returns>
         [DllImport("ntdll.dll")]
-        public static extern uint NtQueryInformationThread(SafeMemoryHandle hwnd, uint infoclass, ref ThreadBasicInformation threadinfo, int length, IntPtr bytesread); 
+        public static extern unsafe uint NtQueryInformationThread(SafeMemoryHandle handle, ThreadInformationClass threadInformationClass,
+            void* threadInformation, IntPtr threadInformationLength, out IntPtr returnLength);
         #endregion
 
         #region OpenProcess
@@ -603,18 +606,19 @@ namespace Binarysharp.MemoryManagement.Native
         /// A handle to the thread whose context is to be set. The handle must have the <see cref="ThreadAccessFlags.SetContext"/> access right to the thread. 
         /// For more information, see Thread Security and Access Rights.</param>
         /// <param name="lpContext">
-        /// A pointer to a <see cref="ThreadContext"/> structure that contains the context to be set in the specified thread. 
+        /// A pointer to a structure that contains the context to be set in the specified thread. 
         /// The value of the ContextFlags member of this structure specifies which portions of a thread's context to set. 
-        /// Some values in the <see cref="ThreadContext"/> structure that cannot be specified are silently set to the correct value. 
+        /// Some values in the structure that cannot be specified are silently set to the correct value. 
         /// This includes bits in the CPU status register that specify the privileged processor mode, global enabling bits in the debugging register, 
         /// and other states that must be controlled by the operating system.
         /// </param>
         /// <returns>
-        /// If the context was set, the return value is nonzero.
+        /// If the function succeeds, the return value is nonzero.
         /// If the function fails, the return value is zero. To get extended error information, call <see cref="Marshal.GetLastWin32Error"/>.
+        /// The return type is initially a BOOL (of 4 bytes length), which corresponds to an integer to prevent any marshalling.
         /// </returns>
         [DllImport("kernel32.dll", SetLastError = true)]
-        public static extern bool SetThreadContext(SafeMemoryHandle hThread, [MarshalAs(UnmanagedType.Struct)] ref ThreadContext lpContext);
+        public static extern unsafe int SetThreadContext(SafeMemoryHandle hThread, void* lpContext);
 
         #endregion
 
@@ -728,7 +732,7 @@ namespace Binarysharp.MemoryManagement.Native
         /// If the function fails, the return value is NULL. To get extended error information, call <see cref="Marshal.GetLastWin32Error"/>.
         /// </returns>
         [DllImport("kernel32.dll", SetLastError = true)]
-        public static extern IntPtr VirtualAllocEx(SafeMemoryHandle hProcess, IntPtr lpAddress, int dwSize, MemoryAllocationFlags flAllocationType, MemoryProtectionFlags flProtect);
+        public static extern IntPtr VirtualAllocEx(SafeMemoryHandle hProcess, IntPtr lpAddress, IntPtr dwSize, MemoryAllocationFlags flAllocationType, MemoryProtectionFlags flProtect);
         #endregion
 
         #region VirtualFreeEx
@@ -792,7 +796,7 @@ namespace Binarysharp.MemoryManagement.Native
         /// If the function fails, the return value is zero. To get extended error information, call <see cref="Marshal.GetLastWin32Error"/>.
         /// </returns>
         [DllImport("kernel32.dll", SetLastError = true)]
-        public static extern bool VirtualProtectEx(SafeMemoryHandle hProcess, IntPtr lpAddress, int dwSize, MemoryProtectionFlags flNewProtect, out MemoryProtectionFlags lpflOldProtect);
+        public static extern bool VirtualProtectEx(SafeMemoryHandle hProcess, IntPtr lpAddress, IntPtr dwSize, MemoryProtectionFlags flNewProtect, out MemoryProtectionFlags lpflOldProtect);
         #endregion
 
         #region VirtualQueryEx
@@ -817,7 +821,7 @@ namespace Binarysharp.MemoryManagement.Native
         /// If the function fails, the return value is zero. To get extended error information, call <see cref="Marshal.GetLastWin32Error"/>.
         /// </returns>
         [DllImport("kernel32.dll", SetLastError = true)]
-        public static extern int VirtualQueryEx(SafeMemoryHandle hProcess, IntPtr lpAddress, out MemoryBasicInformation lpBuffer, int dwLength);
+        public static extern int VirtualQueryEx(SafeMemoryHandle hProcess, IntPtr lpAddress, out MemoryBasicInformation lpBuffer, IntPtr dwLength);
         #endregion
 
         #region WaitForSingleObject

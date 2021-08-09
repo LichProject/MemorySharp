@@ -27,14 +27,22 @@ namespace Binarysharp.MemoryManagement.Assembly
         /// The reference of the <see cref="MemorySharp"/> object.
         /// </summary>
         protected readonly MemorySharp MemorySharp;
+        /// <summary>
+        /// The internal field that stores the lazy evaluation for the assembler.
+        /// </summary>
+        private Lazy<IAssembler> _assembler;
         #endregion
 
         #region Properties
         #region Assembler
         /// <summary>
-        /// The assembler used by the factory.
+        /// Gets or sets the assembler used by the factory.
         /// </summary>
-        public IAssembler Assembler { get; set; }
+        public IAssembler Assembler
+        {
+            get => _assembler.Value;
+            set => _assembler = new Lazy<IAssembler>(() => value);
+        }
         #endregion
         #endregion
 
@@ -47,12 +55,13 @@ namespace Binarysharp.MemoryManagement.Assembly
         {
             // Save the parameter
             MemorySharp = memorySharp;
-            // Create the tool
-            Assembler = new Fasm32Assembler();
+
+            // Create the default assembler lazily
+            _assembler = new Lazy<IAssembler>(CreateDefaultAssembler);
         }
         #endregion
 
-        #region Methods
+        #region Public methods
         #region BeginTransaction
         /// <summary>
         /// Begins a new transaction to inject and execute assembly code into the process at the specified address.
@@ -145,15 +154,10 @@ namespace Binarysharp.MemoryManagement.Assembly
             {
                 // Get the object dedicated to create mnemonics for the given calling convention
                 var calling = CallingConventionSelector.Get(callingConvention);
-                // Push the parameters
-                t.AddLine(calling.FormatParameters(marshalledParameters.Select(p => p.Reference).ToArray()));
-                // Call the function
-                t.AddLine(calling.FormatCalling(address));
-                // Clean the parameters
-                if(calling.Cleanup == CleanupTypes.Caller)
-                    t.AddLine(calling.FormatCleaning(marshalledParameters.Length));
-                // Add the return mnemonic
-                t.AddLine("retn");
+                var references = marshalledParameters.Select(p => p.Reference).ToArray();
+
+                calling.FormatCall(address, references, t.Instructions);
+                t.Instructions.Add("ret");
             }
 
             // Clean the marshalled parameters
@@ -242,80 +246,42 @@ namespace Binarysharp.MemoryManagement.Assembly
         /// <summary>
         /// Assembles mnemonics and injects the corresponding assembly code into the remote process at the specified address.
         /// </summary>
-        /// <param name="asm">The mnemonics to inject.</param>
+        /// <param name="instructions">The instructions represented in assembly code.</param>
         /// <param name="address">The address where the assembly code is injected.</param>
-        public void Inject(string asm, IntPtr address)
+        public void Inject(string[] instructions, IntPtr address)
         {
-            MemorySharp.Write(address, Assembler.Assemble(asm, address), false);
-        }
-        /// <summary>
-        /// Assembles mnemonics and injects the corresponding assembly code into the remote process at the specified address.
-        /// </summary>
-        /// <param name="asm">An array containing the mnemonics to inject.</param>
-        /// <param name="address">The address where the assembly code is injected.</param>
-        public void Inject(string[] asm, IntPtr address)
-        {
-            Inject(String.Join("\n", asm), address);
+            MemorySharp.Write(address, Assembler.Assemble(instructions, address), false);
         }
         /// <summary>
         /// Assembles mnemonics and injects the corresponding assembly code into the remote process.
         /// </summary>
-        /// <param name="asm">The mnemonics to inject.</param>
+        /// <param name="instructions">The instructions represented in assembly code.</param>
         /// <returns>The address where the assembly code is injected.</returns>
-        public RemoteAllocation Inject(string asm)
+        public RemoteAllocation Inject(string[] instructions)
         {
             // Assemble the assembly code
-            var code = Assembler.Assemble(asm);
+            var code = Assembler.Assemble(instructions);
             // Allocate a chunk of memory to store the assembly code
             var memory = MemorySharp.Memory.Allocate(code.Length);
             // Inject the code
-            Inject(asm, memory.BaseAddress);
+            Inject(instructions, memory.BaseAddress);
             // Return the memory allocated
             return memory;
-        }
-        /// <summary>
-        /// Assembles mnemonics and injects the corresponding assembly code into the remote process.
-        /// </summary>
-        /// <param name="asm">An array containing the mnemonics to inject.</param>
-        /// <returns>The address where the assembly code is injected.</returns>
-        public RemoteAllocation Inject(string[] asm)
-        {
-            return Inject(String.Join("\n", asm));
         }
         #endregion
         #region InjectAndExecute
         /// <summary>
         /// Assembles, injects and executes the mnemonics into the remote process at the specified address.
         /// </summary>
-        /// <param name="asm">The mnemonics to inject.</param>
+        /// <param name="instructions">The instructions represented in assembly code.</param>
         /// <param name="address">The address where the assembly code is injected.</param>
         /// <returns>The return value is the exit code of the thread created to execute the assembly code.</returns>
-        public T InjectAndExecute<T>(string asm, IntPtr address)
+        public T InjectAndExecute<T>(string[] instructions, IntPtr address)
         {
             // Inject the assembly code
-            Inject(asm, address);
+            Inject(instructions, address);
             // Execute the code
             return Execute<T>(address);
-        }
-        /// <summary>
-        /// Assembles, injects and executes the mnemonics into the remote process at the specified address.
-        /// </summary>
-        /// <param name="asm">The mnemonics to inject.</param>
-        /// <param name="address">The address where the assembly code is injected.</param>
-        /// <returns>The return value is the exit code of the thread created to execute the assembly code.</returns>
-        public IntPtr InjectAndExecute(string asm, IntPtr address)
-        {
-            return InjectAndExecute<IntPtr>(asm, address);
-        }
-        /// <summary>
-        /// Assembles, injects and executes the mnemonics into the remote process at the specified address.
-        /// </summary>
-        /// <param name="asm">An array containing the mnemonics to inject.</param>
-        /// <param name="address">The address where the assembly code is injected.</param>
-        /// <returns>The return value is the exit code of the thread created to execute the assembly code.</returns>
-        public T InjectAndExecute<T>(string[] asm, IntPtr address)
-        {
-            return InjectAndExecute<T>(String.Join("\n", asm), address);
         }
         /// <summary>
         /// Assembles, injects and executes the mnemonics into the remote process at the specified address.
@@ -330,34 +296,16 @@ namespace Binarysharp.MemoryManagement.Assembly
         /// <summary>
         /// Assembles, injects and executes the mnemonics into the remote process.
         /// </summary>
-        /// <param name="asm">The mnemonics to inject.</param>
+        /// <param name="instructions">The instructions represented in assembly code.</param>
         /// <returns>The return value is the exit code of the thread created to execute the assembly code.</returns>
-        public T InjectAndExecute<T>(string asm)
+        public T InjectAndExecute<T>(string[] instructions)
         {
             // Inject the assembly code
-            using (var memory = Inject(asm))
+            using (var memory = Inject(instructions))
             {
                 // Execute the code
                 return Execute<T>(memory.BaseAddress);
             }
-        }
-        /// <summary>
-        /// Assembles, injects and executes the mnemonics into the remote process.
-        /// </summary>
-        /// <param name="asm">The mnemonics to inject.</param>
-        /// <returns>The return value is the exit code of the thread created to execute the assembly code.</returns>
-        public IntPtr InjectAndExecute(string asm)
-        {
-            return InjectAndExecute<IntPtr>(asm);
-        }
-        /// <summary>
-        /// Assembles, injects and executes the mnemonics into the remote process.
-        /// </summary>
-        /// <param name="asm">An array containing the mnemonics to inject.</param>
-        /// <returns>The return value is the exit code of the thread created to execute the assembly code.</returns>
-        public T InjectAndExecute<T>(string[] asm)
-        {
-            return InjectAndExecute<T>(String.Join("\n", asm));
         }
         /// <summary>
         /// Assembles, injects and executes the mnemonics into the remote process.
@@ -373,78 +321,56 @@ namespace Binarysharp.MemoryManagement.Assembly
         /// <summary>
         /// Assembles, injects and executes asynchronously the mnemonics into the remote process at the specified address.
         /// </summary>
-        /// <param name="asm">The mnemonics to inject.</param>
+        /// <param name="instructions">The instructions represented in assembly code.</param>
         /// <param name="address">The address where the assembly code is injected.</param>
         /// <returns>The return value is an asynchronous operation that return the exit code of the thread created to execute the assembly code.</returns>
-        public Task<T> InjectAndExecuteAsync<T>(string asm, IntPtr address)
+        public Task<T> InjectAndExecuteAsync<T>(string[] instructions, IntPtr address)
         {
-            return Task.Run(() => InjectAndExecute<T>(asm, address));
+            return Task.Run(() => InjectAndExecute<T>(instructions, address));
         }
         /// <summary>
         /// Assembles, injects and executes asynchronously the mnemonics into the remote process at the specified address.
         /// </summary>
-        /// <param name="asm">The mnemonics to inject.</param>
+        /// <param name="instructions">The instructions represented in assembly code.</param>
         /// <param name="address">The address where the assembly code is injected.</param>
         /// <returns>The return value is an asynchronous operation that return the exit code of the thread created to execute the assembly code.</returns>
-        public Task<IntPtr> InjectAndExecuteAsync(string asm, IntPtr address)
+        public Task<IntPtr> InjectAndExecuteAsync(string[] instructions, IntPtr address)
         {
-            return InjectAndExecuteAsync<IntPtr>(asm, address);
-        }
-        /// <summary>
-        /// Assembles, injects and executes asynchronously the mnemonics into the remote process at the specified address.
-        /// </summary>
-        /// <param name="asm">An array containing the mnemonics to inject.</param>
-        /// <param name="address">The address where the assembly code is injected.</param>
-        /// <returns>The return value is an asynchronous operation that return the exit code of the thread created to execute the assembly code.</returns>
-        public Task<T> InjectAndExecuteAsync<T>(string[] asm, IntPtr address)
-        {
-            return Task.Run(() => InjectAndExecute<T>(asm, address));
-        }
-        /// <summary>
-        /// Assembles, injects and executes asynchronously the mnemonics into the remote process at the specified address.
-        /// </summary>
-        /// <param name="asm">An array containing the mnemonics to inject.</param>
-        /// <param name="address">The address where the assembly code is injected.</param>
-        /// <returns>The return value is an asynchronous operation that return the exit code of the thread created to execute the assembly code.</returns>
-        public Task<IntPtr> InjectAndExecuteAsync(string[] asm, IntPtr address)
-        {
-            return InjectAndExecuteAsync<IntPtr>(asm, address);
+            return InjectAndExecuteAsync<IntPtr>(instructions, address);
         }
         /// <summary>
         /// Assembles, injects and executes asynchronously the mnemonics into the remote process.
         /// </summary>
-        /// <param name="asm">The mnemonics to inject.</param>
+        /// <param name="instructions">The instructions represented in assembly code.</param>
         /// <returns>The return value is an asynchronous operation that return the exit code of the thread created to execute the assembly code.</returns>
-        public Task<T> InjectAndExecuteAsync<T>(string asm)
+        public Task<T> InjectAndExecuteAsync<T>(string[] instructions)
         {
-            return Task.Run(() => InjectAndExecute<T>(asm));
+            return Task.Run(() => InjectAndExecute<T>(instructions));
         }
         /// <summary>
         /// Assembles, injects and executes asynchronously the mnemonics into the remote process.
         /// </summary>
-        /// <param name="asm">The mnemonics to inject.</param>
+        /// <param name="instructions">The instructions represented in assembly code.</param>
         /// <returns>The return value is an asynchronous operation that return the exit code of the thread created to execute the assembly code.</returns>
-        public Task<IntPtr> InjectAndExecuteAsync(string asm)
+        public Task<IntPtr> InjectAndExecuteAsync(string[] instructions)
         {
-            return InjectAndExecuteAsync<IntPtr>(asm);
+            return InjectAndExecuteAsync<IntPtr>(instructions);
         }
+        #endregion
+        #endregion
+
+        #region Private methods
+        #region CreateDefaultAssembler
         /// <summary>
-        /// Assembles, injects and executes asynchronously the mnemonics into the remote process.
+        /// Creates the default assembler proposed by the library.
         /// </summary>
-        /// <param name="asm">An array containing the mnemonics to inject.</param>
-        /// <returns>The return value is an asynchronous operation that return the exit code of the thread created to execute the assembly code.</returns>
-        public Task<T> InjectAndExecuteAsync<T>(string[] asm)
+        private IAssembler CreateDefaultAssembler()
         {
-            return Task.Run(() => InjectAndExecute<T>(asm));
-        }
-        /// <summary>
-        /// Assembles, injects and executes asynchronously the mnemonics into the remote process.
-        /// </summary>
-        /// <param name="asm">An array containing the mnemonics to inject.</param>
-        /// <returns>The return value is an asynchronous operation that return the exit code of the thread created to execute the assembly code.</returns>
-        public Task<IntPtr> InjectAndExecuteAsync(string[] asm)
-        {
-            return InjectAndExecuteAsync<IntPtr>(asm);
+            var instructionSet = MemorySharp.Is64Process
+                ? InstructionSet.X64
+                : InstructionSet.X86;
+
+            return new KeystoneAssembler(instructionSet);
         }
         #endregion
         #endregion

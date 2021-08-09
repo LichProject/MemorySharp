@@ -9,6 +9,8 @@
 using System;
 using System.Diagnostics;
 using System.Threading;
+using Binarysharp.MemoryManagement.Helpers;
+using Binarysharp.MemoryManagement.Native;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace MemorySharpTests
@@ -74,6 +76,23 @@ namespace MemorySharpTests
 
             // Assert
             Assert.AreEqual(offset, relative, "Couldn't get the relative address.");
+        }
+
+        /// <summary>
+        /// Determines whether the target process is 64-bit.
+        /// </summary>
+        [TestMethod]
+        public void Is64Process_ShouldMatchArchitectureOfTestProject()
+        {
+            // Arrange
+            var handle = Resources.MemorySharp.Handle;
+
+            // Act
+            var is64TestProcess = ArchitectureDetector.Is64Process(handle);
+            var is64SelfProcess = IntPtr.Size == 8;
+
+            // Assert
+            Assert.AreEqual(is64SelfProcess, is64TestProcess);
         }
 
         /// <summary>
@@ -185,6 +204,24 @@ namespace MemorySharpTests
 
             // Assert
             Assert.IsFalse(ret);
+        }
+
+        [TestMethod]
+        public void Peb_ShouldReturnTheOsVersion()
+        {
+            // Arrange
+            var peb = Resources.MemorySharp.Peb;
+            var version = Environment.OSVersion.Version;
+
+            // Act
+            var pebMajorVersion = peb.OsMajorVersion;
+            var pebMinorVersion = peb.OsMinorVersion;
+            var pebBuildNumber = peb.OsBuildNumber;
+
+            // Assert
+            Assert.AreEqual(version.Major, (int)pebMajorVersion);
+            Assert.AreEqual(version.Minor, (int)pebMinorVersion);
+            Assert.AreEqual(version.Build, (int)pebBuildNumber);
         }
     }
 }

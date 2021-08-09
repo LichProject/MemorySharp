@@ -29,14 +29,14 @@ namespace Binarysharp.MemoryManagement.Memory
         /// <param name="protectionFlags">The memory protection for the region of pages to be allocated.</param>
         /// <param name="allocationFlags">The type of memory allocation.</param>
         /// <returns>The base address of the allocated region.</returns>
-        public static IntPtr Allocate(SafeMemoryHandle processHandle, int size, MemoryProtectionFlags protectionFlags = MemoryProtectionFlags.ExecuteReadWrite,
+        public static IntPtr Allocate(SafeMemoryHandle processHandle, long size, MemoryProtectionFlags protectionFlags = MemoryProtectionFlags.ExecuteReadWrite,
             MemoryAllocationFlags allocationFlags = MemoryAllocationFlags.Commit)
         {
             // Check if the handle is valid
             HandleManipulator.ValidateAsArgument(processHandle, "processHandle");
             
             // Allocate a memory page
-            var ret = NativeMethods.VirtualAllocEx(processHandle, IntPtr.Zero, size, allocationFlags, protectionFlags);
+            var ret = NativeMethods.VirtualAllocEx(processHandle, IntPtr.Zero, new IntPtr(size), allocationFlags, protectionFlags);
 
             // Check whether the memory page is valid
             if (ret != IntPtr.Zero)
@@ -88,11 +88,11 @@ namespace Binarysharp.MemoryManagement.Memory
 
         #region NtQueryInformationProcess
         /// <summary>
-        /// etrieves information about the specified process.
+        /// Retrieves information about the specified process.
         /// </summary>
         /// <param name="processHandle">A handle to the process to query.</param>
-        /// <returns>A <see cref="ProcessBasicInformation"/> structure containg process information.</returns>
-        public static ProcessBasicInformation NtQueryInformationProcess(SafeMemoryHandle processHandle)
+        /// <returns>A <see cref="ProcessBasicInformation"/> structure containing process information.</returns>
+        public static unsafe ProcessBasicInformation NtQueryInformationProcess(SafeMemoryHandle processHandle)
         {
             // Check if the handle is valid
             HandleManipulator.ValidateAsArgument(processHandle, "processHandle");
@@ -101,14 +101,40 @@ namespace Binarysharp.MemoryManagement.Memory
             var info = new ProcessBasicInformation();
 
             // Get the process info
-            var ret = NativeMethods.NtQueryInformationProcess(processHandle, ProcessInformationClass.ProcessBasicInformation, ref info, info.Size, IntPtr.Zero);
+            void* infoPtr = &info; // info is already fixed
+            var ret = NativeMethods.NtQueryInformationProcess(processHandle, ProcessInformationClass.ProcessBasicInformation,
+                infoPtr, new IntPtr(sizeof(ulong)), out IntPtr returnLength);
 
             // If the function succeeded
             if (ret == 0)
                 return info;
 
             // Else, couldn't get the process info, throws an exception
-            throw new ApplicationException(string.Format("Couldn't get the information from the process, error code '{0}'.", ret));
+            throw new ApplicationException($"The process information cannot be queried; error code '{ret}'.");
+        }
+
+        /// <summary>
+        /// Retrieves information about the specified process.
+        /// </summary>
+        /// <param name="processHandle">A handle to the process to query.</param>
+        /// <param name="processInformationClass">The class of the process to retrieve.</param>
+        /// <returns>A <see cref="ProcessBasicInformation"/> structure containing process information.</returns>
+        public static unsafe ulong NtQueryInformationProcess(SafeMemoryHandle processHandle, ProcessInformationClass processInformationClass)
+        {
+            // Check if the handle is valid
+            HandleManipulator.ValidateAsArgument(processHandle, "processHandle");
+            
+            // Get the process info
+            ulong info = 0;
+            var ret = NativeMethods.NtQueryInformationProcess(processHandle, ProcessInformationClass.ProcessBasicInformation,
+                &info, new IntPtr(sizeof(ulong)), out IntPtr returnLength);
+
+            // If the function succeeded
+            if (ret == 0)
+                return info;
+
+            // Else, couldn't get the process info, throws an exception
+            throw new ApplicationException($"The process information cannot be queried; error code '{ret}'.");
         }
         #endregion
 
@@ -169,7 +195,7 @@ namespace Binarysharp.MemoryManagement.Memory
         /// <param name="size">The size of the region whose access protection attributes are changed, in bytes.</param>
         /// <param name="protection">The memory protection option.</param>
         /// <returns>The old protection of the region in a <see cref="Native.MemoryBasicInformation"/> structure.</returns>
-        public static MemoryProtectionFlags ChangeProtection(SafeMemoryHandle processHandle, IntPtr address, int size, MemoryProtectionFlags protection)
+        public static MemoryProtectionFlags ChangeProtection(SafeMemoryHandle processHandle, IntPtr address, IntPtr size, MemoryProtectionFlags protection)
         {
             // Check if the handles are valid
             HandleManipulator.ValidateAsArgument(processHandle, "processHandle");
@@ -203,7 +229,7 @@ namespace Binarysharp.MemoryManagement.Memory
             MemoryBasicInformation memoryInfo;
 
             // Query the memory region
-            if(NativeMethods.VirtualQueryEx(processHandle, baseAddress, out memoryInfo, MarshalType<MemoryBasicInformation>.Size) != 0)
+            if(NativeMethods.VirtualQueryEx(processHandle, baseAddress, out memoryInfo, MarshalType<MemoryBasicInformation>.SizeAsPointer) != 0)
                 return memoryInfo;
 
             // Else the information couldn't be got
@@ -220,13 +246,9 @@ namespace Binarysharp.MemoryManagement.Memory
         {
             // Check if the handle is valid
             HandleManipulator.ValidateAsArgument(processHandle, "processHandle");
-            
-            // Convert the addresses to Int64
-            var numberFrom = addressFrom.ToInt64();
-            var numberTo = addressTo.ToInt64();
 
             // The first address must be lower than the second
-            if (numberFrom >= numberTo)
+            if (addressFrom.IsGreaterOrEqualThan(addressTo))
                 throw new ArgumentException("The starting address must be lower than the ending address.", "addressFrom");
             
             // Create the variable storing the result of the call of VirtualQueryEx
@@ -239,16 +261,16 @@ namespace Binarysharp.MemoryManagement.Memory
                 MemoryBasicInformation memoryInfo;
 
                 // Get the next memory page
-                ret = NativeMethods.VirtualQueryEx(processHandle, new IntPtr(numberFrom), out memoryInfo, MarshalType<MemoryBasicInformation>.Size);
+                ret = NativeMethods.VirtualQueryEx(processHandle, addressFrom, out memoryInfo, MarshalType<MemoryBasicInformation>.SizeAsPointer);
 
                 // Increment the starting address with the size of the page
-                numberFrom += memoryInfo.RegionSize;
+                addressFrom = addressFrom.Add(memoryInfo.RegionSize);
 
                 // Return the memory page
                 if(memoryInfo.State != MemoryStateFlags.Free)
                     yield return memoryInfo;
 
-            } while (numberFrom < numberTo && ret != 0);
+            } while (addressFrom.IsSmallerThan(addressTo) && ret != 0);
         }
         #endregion
 

@@ -105,23 +105,60 @@ namespace MemorySharpTests.Threading
             {
                 ThreadCore.SuspendThread(handle);
 
-                // Get the context
-                var original = ThreadCore.GetThreadContext(handle);
-                var modified = original;
+#if x86
+                const uint eaxToTest = 0x666;
 
-                Assert.AreNotEqual(0, modified.Eip);
+                // Get the context
+                ThreadContext32 context = new ThreadContext32(ThreadContextFlags.All);
+                ThreadCore.GetThreadContext(handle, ref context);
+
+                Assert.AreNotEqual(0u, context.Eip);
 
                 // Set a value to eax
-                modified.Eax = 0x666;
-                // Set the context
-                ThreadCore.SetThreadContext(handle, modified);
-                // Re-get the context to check if it's all right
-                modified = ThreadCore.GetThreadContext(handle);
+                var originalEax = context.Eax;
+                context.Eax = eaxToTest;
 
-                Assert.AreEqual((uint)0x666, modified.Eax);
+                // Set the context
+                ThreadCore.SetThreadContext(handle, ref context);
+
+                // Re-get the context to check if it's all right
+                context.Eax = 0;
+                ThreadCore.GetThreadContext(handle, ref context);
+
+                Assert.AreEqual(eaxToTest, context.Eax);
 
                 // Restore the original context
-                ThreadCore.SetThreadContext(handle, original);
+                context.Eax = originalEax;
+                ThreadCore.SetThreadContext(handle, ref context);
+#elif x64
+                const ulong raxToTest = 0x666;
+                // The data structure must be aligned to 16 bytes
+                StackAllocAlignment.Allocate(16, (ref ThreadContext64 context) =>
+                {
+                    // Get the context
+                    context.ContextFlags = ThreadContextFlags.All;
+                    ThreadCore.GetThreadContext(handle, ref context);
+
+                    Assert.AreNotEqual(0ul, context.Rip);
+
+                    // Set the value to rax
+                    var originalRax = context.Rax;
+                    context.Rax = raxToTest;
+
+                    // Set the context
+                    ThreadCore.SetThreadContext(handle, ref context);
+
+                    // Re-get the context to check if it's all right
+                    context.Rax = 0;
+                    ThreadCore.GetThreadContext(handle, ref context);
+
+                    Assert.AreEqual(raxToTest, context.Rax);
+
+                    // Restore the original context
+                    context.Rax = originalRax;
+                    ThreadCore.SetThreadContext(handle, ref context);
+                });
+#endif
             }
             finally
             {

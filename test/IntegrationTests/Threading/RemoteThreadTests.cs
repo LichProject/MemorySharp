@@ -7,7 +7,6 @@
  * See the file LICENSE for more information.
 */
 using System;
-using System.Linq;
 using System.Threading;
 using Binarysharp.MemoryManagement.Native;
 using Binarysharp.MemoryManagement.Threading;
@@ -57,6 +56,7 @@ namespace MemorySharpTests.Threading
             Assert.IsTrue(thread.IsTerminated);
 
             Resources.Restart();
+            Thread.Sleep(1000);
         }
 
         /// <summary>
@@ -69,82 +69,123 @@ namespace MemorySharpTests.Threading
             var sharp = Resources.MemorySharp;
 
             // Act
-            var context = sharp.Threads.MainThread.Context;
+#if x86
+            var context = new ThreadContext32(ThreadContextFlags.All);
+            sharp.Threads.MainThread.GetContext(ref context);
 
             // Assert
             Assert.AreNotEqual(0, context.Eip);
+#elif x64
+            // The data structure must be aligned to 16 bytes
+            Binarysharp.MemoryManagement.Helpers.StackAllocAlignment.Allocate(16, (ref ThreadContext64 context) =>
+            {
+                context.ContextFlags = ThreadContextFlags.All;
+                sharp.Threads.MainThread.GetContext(ref context);
+
+                // Assert
+                Assert.AreNotEqual(0, context.Rip);
+            });
+#endif
         }
 
         /// <summary>
         /// Gets all segment addresses of the main thread.
         /// </summary>
         [TestMethod]
-        public void GetRealSegmentAddress_GetAllSegmentsMainThread()
+        public void GetRealSegmentAddress_GetAllSegmentsMainThreadX86()
         {
+#if x86
             // Arrange
             var sharp = Resources.MemorySharp;
 
             // Act
+            var context = new ThreadContext32(ThreadContextFlags.All);
+            sharp.Threads.MainThread.GetContext(ref context);
+
             var thread = sharp.Threads.MainThread;
-            var fs = thread.GetRealSegmentAddress(SegmentRegisters.Fs);
-
-            // Assert.
-            Assert.AreNotEqual(IntPtr.Zero, fs, "The FS segment is null.");
-        }
-
-        /// <summary>
-        /// Copies the TlsSlots from a thread to the main one by erasing them (YEAH, it's a bit evil :D).
-        /// </summary>
-        [TestMethod]
-        public void TebTlsSlots_CopyTlsFromAnotherThread()
-        {
-            // Arrange
-            var sharp = Resources.MemorySharp;
-            var t1 = sharp.Threads.MainThread;
-            var t2 = sharp.Threads.RemoteThreads.Last();
-            var values = new[] { new IntPtr(0x1123344), new IntPtr(0x55667788) };
-
-            // Act
-            // Write identifiable data
-            t2.Teb.TlsSlots = values;
-            // Erase main tls :O
-            t1.Teb.TlsSlots = t2.Teb.TlsSlots;
+            var fs = thread.GetRealSegmentAddress(SegmentRegisters.Fs, ref context);
 
             // Assert
-            Assert.AreEqual(values[0], t1.Teb.TlsSlots[0], "Couldn't read/write TLS.");
-            Assert.AreEqual(values[1], t1.Teb.TlsSlots[1], "Couldn't read/write TLS (2).");
-
-            Resources.Restart();
+            Assert.AreNotEqual(IntPtr.Zero, fs, "The FS segment is null.");
+#endif
         }
 
         /// <summary>
-        /// [No Assert] Changes the EIP register.
+        /// Validates that at least one information retrieved from the teb is valid.
         /// </summary>
         [TestMethod]
-        public void SuspendResumeSetContextEip()
+        public void TebTreadId_ShouldCorrespondToTheCorrectThreadId()
         {
             // Arrange
             var sharp = Resources.MemorySharp;
-            var sharp2 = Resources.MemorySharp;
             var thread = sharp.Threads.MainThread;
-            const uint value = 0x666;
 
             // Act
-            using (thread.Suspend())
+            var tid = thread.Teb.ThreadId;
+
+            // Assert
+            Assert.AreEqual(thread.Id, tid.ToInt32());
+        }
+
+        /// <summary>
+        /// Changes the EIP register.
+        /// </summary>
+        [TestMethod]
+        public unsafe void SuspendResumeSetContextIp()
+        {
+            // Arrange
+            var sharp = Resources.MemorySharp;
+            var thread = sharp.Threads.MainThread;
+
+            // Act
+#if x86
+            const uint newEip = 0x666;
+
+            // Get the original value
+            var context = new ThreadContext32(ThreadContextFlags.All);
+            thread.GetContext(ref context);
+            var originalEip = context.Eip;
+
+            //Set the value
+            context.Eip = newEip;
+            thread.SetContext(ref context);
+
+            // Get the context again to validate the change
+            thread.GetContext(ref context);
+
+            // Assert
+            Assert.AreEqual(newEip, context.Eip, "The values are not equal.");
+
+            // Set the original value back
+            context.Eip = originalEip;
+            thread.SetContext(ref context);
+#elif x64
+            const ulong newRip = 0x666;
+
+            // The data structure must be aligned to 16 bytes
+            Binarysharp.MemoryManagement.Helpers.StackAllocAlignment.Allocate(16, (ref ThreadContext64 context) =>
             {
                 // Get the original value
-                var original = thread.Context;
-                // Set the value
-                var context = thread.Context;
-                context.Eip = value;
-                sharp.Threads.MainThread.Context = context;
+                context.ContextFlags = ThreadContextFlags.All;
+                thread.GetContext(ref context);
+
+                var originalRip = context.Rip;
+
+                //Set the value
+                context.Rip = newRip;
+                thread.SetContext(ref context);
+
+                // Get the context again to validate the change
+                thread.GetContext(ref context);
 
                 // Assert
-                Assert.AreEqual(sharp2.Threads.MainThread.Context.Eip, thread.Context.Eip, "The values are not equal.");
+                Assert.AreEqual(newRip, context.Rip, "The values are not equal.");
 
-                // Set the origial value back
-                thread.Context = original;
-            }
+                // Set the original value back
+                context.Rip = originalRip;
+                thread.SetContext(ref context);
+            });
+#endif  
         }
 
         /// <summary>
