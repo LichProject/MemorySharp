@@ -16,14 +16,10 @@ namespace Binarysharp.MemoryManagement.Assembly.CallingConvention
     /// </remarks>
     public class MicrosoftX64CallingConvention : ICallingConvention
     {
-        private const int ShadowSpaceSize = 32;
+        const int ShadowSpaceSize = 0x28;
 
-        /// <summary>
-        /// Formats a call to a function pointer.
-        /// </summary>
-        /// <param name="function">The function pointer.</param>
-        /// <param name="parameters">The pointer of the parameters.</param>
-        /// <param name="instructions">The list that receives the assembly instructions.</param>
+        #region Implementation of ICallingConvention
+
         public void FormatCall(IntPtr function, IntPtr[] parameters, List<string> instructions)
         {
             // Set up the parameters
@@ -33,17 +29,20 @@ namespace Binarysharp.MemoryManagement.Assembly.CallingConvention
                 default:
                     instructions.Add("mov r9, " + parameters[3]);
                     goto case 3;
+
                 case 3:
                     instructions.Add("mov r8, " + parameters[2]);
                     goto case 2;
+
                 case 2:
                     instructions.Add("mov rdx, " + parameters[1]);
                     goto case 1;
+
                 case 1:
                     instructions.Add("mov rcx, " + parameters[0]);
                     break;
-                case 0:
-                    break;
+
+                case 0: break;
             }
 
             // The remaining parameters are pushed onto the stack in right-to-left order
@@ -63,5 +62,7 @@ namespace Binarysharp.MemoryManagement.Assembly.CallingConvention
             var numberOfParamOnStack = Math.Max(parameters.Length - 4, 0);
             instructions.Add("add rsp, " + (ShadowSpaceSize + numberOfParamOnStack * 8));
         }
+
+        #endregion
     }
 }
